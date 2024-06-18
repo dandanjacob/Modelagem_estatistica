@@ -147,6 +147,9 @@ print(summary_model)
 aic_value <- AIC(model)
 print(paste("AIC:", aic_value))
 
+bic_value <- BIC(model)
+print(paste("BIC:", bic_value))
+
 r2_value <- r2(model)
 print(paste("R²:", r2_value[[1]]))
 
@@ -199,6 +202,9 @@ print(summary_model)
 
 aic_value <- AIC(model)
 print(paste("AIC:", aic_value))
+
+bic_value <- BIC(model)
+print(paste("BIC:", bic_value))
 
 r2_value <- r2(model)
 print(paste("R²:", r2_value[[1]]))

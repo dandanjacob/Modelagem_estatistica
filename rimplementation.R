@@ -13,7 +13,7 @@ library(dplyr)
 getwd()
 
 # Carregar os dados
-data <- read.csv("C:\\Users\\Daniel\\OneDrive\\Área de Trabalho\\7período\\ME\\projeto_final\\insurance.csv")
+data <- read.csv("insurance.csv")
 print(head(data))
 
 #-------------- TRANSFORM DATA --------------#
@@ -136,17 +136,6 @@ data_nao_fumantes <- subset(data, smoker_yes == 0)
 #   theme_minimal() + 
 #   theme(plot.title = element_text(hjust = 0.5))
 
-#-------------- REMOÇÃO DE OUTLIERS --------------#
-
-# Calcular os limites superior e inferior usando os quartis dos dados
-limite_inferior <- quantile(data$charges, probs = 0.25) - 1.5 * IQR(data$charges)
-limite_superior <- quantile(data$charges, probs = 0.75) + 1.5 * IQR(data$charges)
-
-# Identificar outliers com base nos resíduos
-outliers <- residuos < limite_inferior | residuos > limite_superior
-
-# Remover outliers do conjunto de dados
-data <- data[!outliers, ]
 
 #-------------- SIMPLE REGRESSION --------------#
 model <- lm(charges ~   square_age + bmi + children + sex_male+ northeast+ northwest + southeast +southwest +
@@ -252,99 +241,3 @@ residuos <- residuals(model)
 # Plotar os resíduos
 hist(residuos, main = "Histograma dos Resíduos", xlab = "Resíduos", col = "skyblue")
 
-#-------------- SUBNIVEL REGRESSION  - NON OUTLIERS --------------#
-# data_no_smoker_outliers <- data %>%
-#   group_by(smoker_yes) %>%
-#   filter(!(smoker_yes == 0 & charges < quantile(charges, 0.25) - 1.5 * IQR(charges) | 
-#              charges > quantile(charges, 0.75) + 1.5 * IQR(charges)))
-# 
-# data_smoker_no_obese_outliers <- data %>%
-#   group_by(smoker_yes, obese) %>%
-#   filter(!(smoker_yes == 1 & obese == 0 & charges < quantile(charges, 0.25) - 1.5 * IQR(charges) | 
-#              charges > quantile(charges, 0.75) + 1.5 * IQR(charges)))
-# 
-# data_smoker_obese_outliers <- data %>%
-#   group_by(smoker_yes, obese) %>%
-#   filter(!(smoker_yes == 1 & obese == 1 & charges < quantile(charges, 0.25) - 1.5 * IQR(charges) | 
-#              charges > quantile(charges, 0.75) + 1.5 * IQR(charges)))
-# 
-# dados <- bind_rows(data_no_smoker_outliers, data_smoker_no_obese_outliers, data_smoker_obese_outliers)
-# #plot boxplot
-
-remove_outliers <- function(df, group_var, value_var) {
-  df %>%
-    group_by({{group_var}}) %>%
-    mutate(
-      q1 = quantile({{value_var}}, 0.25),
-      q3 = quantile({{value_var}}, 0.75),
-      iqr = q3 - q1,
-      lower_limit = q1 - 1.5 * iqr,
-      upper_limit = q3 + 1.5 * iqr
-    ) %>%
-    filter({{value_var}} >= lower_limit & {{value_var}} <= upper_limit) %>%
-    ungroup()
-}
-
-# Aplicar a função para remover outliers no grupo de não fumantes
-dados <- remove_outliers(data, smoker_yes, charges)
-
-ggplot(dados, aes(x = factor(smoker_yes), y = charges)) +
-geom_boxplot() +
-labs(title = "Boxplot de Charges por Fumantes e Não Fumantes",
-     x = "Fumante (0 = Não, 1 = Sim)",
-     y = "Charges") +
-scale_fill_manual(values = c("blue", "red")) +  # Escolha cores personalizadas
-theme_minimal()
-
-#aplly multinível regresson
-model <- lmer(charges ~   square_age + bmi + children + sex_male+ northeast+ northwest + southeast +southwest   + (1 | smoker_yes:obese), data = dados)
-
-
-summary_model <- summary(model)
-print(summary_model)
-#saveRDS(model, file = "model.rds")
-#capture.output(summary_model, file = "model_summary.txt")
-
-aic_value <- AIC(model)
-print(paste("AIC:", aic_value))
-
-r2_value <- r2(model)
-print(paste("R²:", r2_value[[1]]))
-
-#write(paste("AIC:", aic_value, "\nR²:", r2_value), file = "model_metrics.txt")
-
-
-# Obter os valores preditos
-predicted <- predict(model, dados)
-
-# Definir cores
-#colors <- ifelse(data$smoker_yes == 0, "blue", 
-#                 ifelse(data$obese == 1, "pink", "red"))
-data_predicted <- data.frame(dados$charges, predicted,dados$smoker_yes, dados$obese)
-# print(head(data_predicted))
-colors <- ifelse(dados$obese == 0, "blue", "red")
-
-
-# Gráfico ggplot com adição da linha y = x e legenda
-# Gráfico ggplot com adição da linha y = x e legenda
-ggplot(data_predicted, aes(x = dados.charges, y = predicted, color = factor(dados.smoker_yes), shape = factor(dados.obese))) +
-  geom_point(size = 3) +  # Adiciona pontos ao gráfico
-  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "gray") +  # Adiciona a linha y = x
-  labs(title = "Idade vs Custos por Status de Fumante e Obesidade",
-       x = "Valor real",
-       y = "Valor predito",
-       color = "Fumante",
-       shape = "Obesidade") +
-  scale_color_manual(values = c("blue", "red"), labels = c("Não Fumante", "Fumante")) +  # Define cores e rótulos para fumantes
-  scale_shape_manual(values = c(1, 16), labels = c("Não Obeso", "Obeso")) +  # Define formas e rótulos invertidos para obesidade
-  guides(color = guide_legend(title = "Status de Fumante", override.aes = list(shape = c(15, 15))),
-         shape = guide_legend(title = "Obesidade", override.aes = list(color = "black", linetype = "dashed"))) +  # Ajusta a legenda de cores com um título personalizado e formas
-  annotate("text", x = 60000, y = 52000, label = "Reta x=y", color = "gray", hjust = 1.1, vjust = 1.1) +
-  theme_minimal() +
-  theme(plot.title = element_text(hjust = 0.5))
-print(coef(model))
-# Calcular os resíduos
-residuos <- residuals(model)
-
-# Plotar os resíduos
-hist(residuos, main = "Histograma dos Resíduos", xlab = "Resíduos", col = "skyblue")
